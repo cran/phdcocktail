@@ -1,0 +1,125 @@
+---
+title: "recode_vrs"
+description: "A brief introduction to recode_vrs() function"
+author: "Dahham Alsoud"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{recode_vrs}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+## Razón de ser
+
+Although new pragmatic platforms (such as RedCap) currently exist, a great deal of research data is still being collected directly in `excel`, where it is easier to code `variables` in a `short form`. For example, "birth date" is commonly coded in a `short form` as "dob" instead of "Date of birth", which is the `publication form`. The same applies to the `values` of variables, such as "F" and "M", which are both values for the "Gender" variable, and stand for "Female" and "Male", respectively.
+
+Recoding variables and their values back to their publication form is an inevitable task during statistical analysis and reporting results.
+
+The `recode_vrs()` function helps effortlessly transform collected data into a publication-ready format using a user-supplied `data dictionary`. Combining `recode_vrs()` with a `data dictionary` ensures `consistency` in recoding research terms across all analyses and publications as one could easily forget how a variable or a term was `labelled` in a previous analysis or publication. The recoded data can then be further used to make figures, table one...etc.
+
+## Terminología
+
+In the above introduction, we have referred to 4 terms:\
+
+`Variable`, such as "dob": this is the `short form` of "Date of birth" that is usually used in `excel` sheets.\
+`Variable label`, such as "Date of birth": this is the `publication form` that we usually encounter in publications.\
+`Value`, such as "F" and "M", which are both values for the "Gender" variable.\
+`Value label`, such as "Female" and "Male", which are the labels of the "Gender" values, "F" and "M", respectively.
+
+The inflammatory bowel disease (IBD) data dictionary `ibd_data_dict` provided in the `phdcocktail` package consists of 4 columns, one for each of the above-described terms.
+
+```{r}
+#| eval: false
+library(phdcocktail)
+data(ibd_data_dict, package = "phdcocktail")
+
+View(ibd_data_dict)
+
+```
+
+![](../man/figures/ibd-data-dict.png)
+
+All 4 columns are required in order for `recode_vrs()` to function as needed. Therefore, user-supplied data dictionaries **should** logically have these columns!
+
+## Uso
+
+When passing a data frame with raw data and a data dictionary to `recode_vrs()`, the function will:\
+
+1)  Search the data dictionary for `variables labels` ***for all variables***, and attach these to the corresponding variables in the original data frame as "label attributes". these attributes can be recognized by `gtsummary::tbl_summary()` or other functions for printing.\
+
+2)  Search the data dictionary for `values labels` ***only for variables specified in the `vrs` argument***. These values will be "recoded" to their corresponding labels.
+
+3)  If the `factor` argument is set to `TRUE`, variables specified in the `vrs` argument will be converted to `ordered factors`, and the order of the levels will be inherited from the order of appearance of the values in the data dictionary. These `ordered factors` are important to have the desired display of values when passing the resulted data frame to functions from `ggplot2`, `gtsummary`...etc.
+
+To see `recode_vrs()` in action, we will make table one from the `ibd_data1` available with the package:
+
+Let's first view this data frame...
+
+```{r}
+#| eval: false
+data(ibd_data1, package = "phdcocktail")
+
+View(ibd_data1)
+
+```
+
+![](../man/figures/ibd-data-raw.png)
+
+We can see that variables and their values are stored in the `short form`. We can make a table one using the data in its current form, but it won't be suitable to be published!
+
+```{r}
+#| eval: false
+library(gtsummary)
+theme_gtsummary_compact() # to make a compact table
+
+ibd_data1 |>
+  tbl_summary(include = -"patientid") # we don't need patient IDs in our table
+
+```
+
+![](../man/figures/table1-raw.png)
+
+Now let's recode this data frame using `recode_vrs()`, and view the new, recoded data frame, which we name here as `ibd_data_recoded`...
+
+```{r}
+#| eval: false
+ibd_data_recoded <- recode_vrs(data = ibd_data1, data_dictionary = ibd_data_dict,
+vrs = c("disease_location", "disease_behaviour", "gender"), factor = TRUE)
+
+View(ibd_data_recoded)
+
+```
+
+![](../man/figures/ibd-data-recoded.png)
+
+We can notice three changes in the new data frame compared to the original one:\
+
+1)  Variables labels are now attached as "attributes" underneath variables names *for all variables* for which a corresponding variable label could be found in the supplied dictionary.\
+
+2)  Values have been **replaced** by their labels *for variables specified in the `vrs` argument*.\
+
+3)  Variables specified in the `vrs` argument have been converted to `ordered factors`.
+
+Finally, let's make table one from the new recoded data...
+
+```{r}
+#| eval: false
+ibd_data_recoded |>
+  tbl_summary(include = -"patientid")
+
+```
+
+![](../man/figures/table1-recoded.png)
+
+## Some questions that might come to mind...
+
+-   *Why not "recode" variables to their labels? who only attach these labels as "label attributes"?*\
+    If we would recode variables names to their labels, then one would have to change these also in the code in the subsequent steps in the analysis because variables names have changed! Since variable labels are only needed for printing, attaching them only as "attributes" is a nice way to provide publishable names, but in the same time preserve original variable names while scripting.\
+
+-   *Why not simply pass these variables/values labels manually to printing functions such as `gtsummary::tbl_summary()`?*\
+    This would be tedious and a waste of time to repeat in each analysis (or maybe several times in one analysis!) assuming that one is working with the same topic/disease. In addition, passing labels manually is hugely prone to errors and inconsistencies across analyses and papers.\
+
+-   *Are there other functions from other packages that can recode variables/values and/or attach label attributes?*\
+    Yes, such as `Hmisc::upData()`, `expss::apply_labels()`, `matchmaker::match_df()` and others....
